@@ -227,13 +227,13 @@ async function loadData(){
   }catch(e){ console.error(e); }
 }
 function fillClassSelect(){
-  // 原班下拉：排除不參與補課的班（如 Hyrox 營）
-  const originable = CLASSES.filter(c=>c.active!=='否');
+  // 原班下拉：列出全部班級（含 Hyrox 營，因為這些學員也要能申請補課）
   document.getElementById('a_origin').innerHTML =
     '<option value="">請選擇你原本上的班級</option>' +
-    originable.map(c=>`<option value="${c.code}">${c.code}（${c.region}）</option>`).join('');
+    CLASSES.map(c=>`<option value="${c.code}">${c.code}（${c.region}）</option>`).join('');
+  // 編輯彈窗的班級下拉：只列可被補的班
   document.getElementById('e_class').innerHTML =
-    originable.map(c=>`<option value="${c.code}">${c.code}</option>`).join('');
+    CLASSES.filter(c=>c.active!=='否').map(c=>`<option value="${c.code}">${c.code}</option>`).join('');
 }
 
 let curRegion = 'all';
@@ -265,24 +265,28 @@ function updateMakeupOptions(){
   const origin = CLASSES.find(c=>c.code===originCode);
   const group = origin ? origin.group : '一般';
 
-  // 特殊群組（養成/Hyrox）不分區，鎖住分區按鈕
-  const special = (group!=='一般');
+  // 可補群組對照：養成→養成；Hyrox營學員→一般；一般→一般
+  const ALLOW = { '養成':['養成'], 'Hyrox':['一般'], '一般':['一般'] };
+  const allowGroups = ALLOW[group] || ['一般'];
+
+  // 只有「養成」是真正特殊（不分區、鎖按鈕）；其餘都可用分區
+  const special = (allowGroups[0]==='養成');
   regionBtns.forEach(b=>{
     b.disabled = special;
     if(special){ b.classList.remove('active'); if(b.dataset.region==='all') b.classList.add('active'); }
   });
   if(special) curRegion='all';
 
-  // 同群組的班（排除不開放補課的）
-  let avail = CLASSES.filter(c=>c.group===group && c.active!=='否');
-  // 一般組才套用分區篩選
-  if(group==='一般' && curRegion!=='all'){
+  // 可補的班（在允許群組內、且開放補課）
+  let avail = CLASSES.filter(c=>allowGroups.indexOf(c.group)!==-1 && c.active!=='否');
+  // 非特殊（一般類）才套用分區篩選
+  if(!special && curRegion!=='all'){
     avail = avail.filter(c=>c.region===curRegion);
   }
 
   let note = '';
-  if(group==='Hyrox') note='（Hyrox／凱為教練學員，僅顯示可補的課）';
-  else if(group==='養成') note='（養成班學員，僅能補養成班）';
+  if(group==='養成') note='（養成班學員，僅能補養成班）';
+  else if(group==='Hyrox') note='（Hyrox 訓練營學員，可補一般跑班/初階班）';
 
   sel.innerHTML = `<option value="">請選擇補課班級${note}</option>` +
     avail.map(c=>`<option value="${c.code}">${c.code}</option>`).join('');
