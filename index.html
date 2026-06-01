@@ -265,28 +265,32 @@ function updateMakeupOptions(){
   const origin = CLASSES.find(c=>c.code===originCode);
   const group = origin ? origin.group : '一般';
 
-  // 可補群組對照：養成→養成；Hyrox營學員→一般；一般→一般
-  const ALLOW = { '養成':['養成'], 'Hyrox':['一般'], '一般':['一般'] };
-  const allowGroups = ALLOW[group] || ['一般'];
+  // 決定可補清單
+  let avail, special=false, note='';
+  if(group==='養成'){
+    // 養成只能補養成
+    avail = CLASSES.filter(c=>c.group==='養成' && c.active!=='否');
+    special=true;
+    note='（養成班學員，僅能補養成班）';
+  } else if(group==='Hyrox'){
+    // Hyrox 訓練營學員：只能補凱為的跑班
+    avail = CLASSES.filter(c=>c.coach==='凱為' && c.active!=='否');
+    special=true;
+    note='（Hyrox 訓練營學員，僅能補凱為教練的跑班）';
+  } else {
+    // 一般/初階：所有一般班（含凱為跑班），但排除 Hyrox 訓練營與不開放的
+    avail = CLASSES.filter(c=>c.group==='一般' && c.active!=='否');
+  }
 
-  // 只有「養成」是真正特殊（不分區、鎖按鈕）；其餘都可用分區
-  const special = (allowGroups[0]==='養成');
+  // 分區按鈕：只有「一般」可用分區，養成/Hyrox 鎖定
   regionBtns.forEach(b=>{
     b.disabled = special;
     if(special){ b.classList.remove('active'); if(b.dataset.region==='all') b.classList.add('active'); }
   });
   if(special) curRegion='all';
-
-  // 可補的班（在允許群組內、且開放補課）
-  let avail = CLASSES.filter(c=>allowGroups.indexOf(c.group)!==-1 && c.active!=='否');
-  // 非特殊（一般類）才套用分區篩選
   if(!special && curRegion!=='all'){
     avail = avail.filter(c=>c.region===curRegion);
   }
-
-  let note = '';
-  if(group==='養成') note='（養成班學員，僅能補養成班）';
-  else if(group==='Hyrox') note='（Hyrox 訓練營學員，可補一般跑班/初階班）';
 
   sel.innerHTML = `<option value="">請選擇補課班級${note}</option>` +
     avail.map(c=>`<option value="${c.code}">${c.code}</option>`).join('');
@@ -299,7 +303,8 @@ function fillDateOptions(){
   const code=document.getElementById('a_class').value;
   const cls=CLASSES.find(c=>c.code===code);
   const sel=document.getElementById('a_date');
-  document.getElementById('a_place').textContent = cls? '📍 '+cls.region+'｜確切上課地址請於申請後私訊教練確認':'';
+  const placeText = cls ? ('📍 '+(cls.place||cls.region)+'（確切集合地點請私訊教練確認）') : '';
+  document.getElementById('a_place').textContent = placeText;
   document.getElementById('a_cap').textContent='';
   if(!cls){ sel.innerHTML='<option value="">請先選擇補課班級</option>'; return; }
 
